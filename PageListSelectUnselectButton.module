@@ -34,8 +34,7 @@ class PageListSelectUnselectButton extends WireData implements Module {
     }
 
     /**
-     * Example1 hooks into the pages->save method and displays a notice every time a page is saved
-     *
+     * add unselect button
      */
     public function unselectbutton($event) {
         $page = $event->object;

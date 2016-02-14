@@ -18,7 +18,7 @@ class PageListSelectUnselectButton extends WireData implements Module {
 
         return array(
             'title' => 'PageListSelectUnselectButton',
-            'version' => 100,
+            'version' => 200,
             'summary' => 'Display an unselect button beside a PageListSelect',
             'href' => 'https://processwire.com',
             'singular' => true,
@@ -30,7 +30,7 @@ class PageListSelectUnselectButton extends WireData implements Module {
      * Initialize the module
      */
     public function init() {
-        $this->addHookAfter('Page::render', $this, 'unselectbutton'); 
+        $this->addHookAfter('Page::render', $this, 'unselectbutton');
     }
 
     /**
@@ -38,37 +38,46 @@ class PageListSelectUnselectButton extends WireData implements Module {
      */
     public function unselectbutton($event) {
         $page = $event->object;
+        $sanitizer = $this->wire('sanitizer');
         // only add this to admin pages
         if($page->template != 'admin') return;
 
         ob_start(); ?>
         <script type="text/javascript">
-            var confirmtext = '<?php echo _("click again to confirm"); ?>';
-            var unselecttext = '<?php echo _("unselect"); ?>';
+            var confirmtext = '<?php echo __("click again to confirm"); ?>';
+            var unselecttext = '<?php echo __("unselect"); ?>';
             var unselectbtn = '<li class="PageListActionSelect PageListSelectUnselectButton"><a href="#">' + unselecttext + '</a></li>';
+
+            // selector to find the fields
+            var ubselector = '<?php echo $sanitizer->entities($this->selector); ?>';
+
+            // initialize unselectbuttons after ajax
+            $( document ).ajaxComplete(function() {
+                $(ubselector).each(function() {
+                    unselectbutton(this);
+
+                    // bind change event listener to this field's input element
+                    $(this).find('input').change(function() {
+                        unselectbutton($(this).closest(ubselector));
+                    });
+
+                });
+            });
 
             $( document ).ready(function() {
 
-                // selector to find the fields
-                var selector = '<?php echo $this->selector; ?>';
-
                 // init unselect buttons on first load
-                $(selector).each(function() {
+                $(ubselector).each(function() {
                     unselectbutton(this);
                 });
 
-                // show/hide unselect button on field change
-                $(selector).find('input').change(function() {
-                    unselectbutton($(this).closest(selector));
-                });
-
-                // handle click on the button
+                // handle click on the unselect-button
                 $('body').on('click', '.PageListSelectUnselectButton a', function(e) {
                     e.preventDefault();
                     if($(this).hasClass('confirmunselect')) {
-                        $(this).closest(selector).find('p.PageListSelectName').html('');
-                        $(this).closest(selector).find('input').val('');
-                        $(this).closest(selector).find('.PageListSelectUnselectButton').remove();
+                        $(this).closest(ubselector).find('p.PageListSelectName').html('');
+                        $(this).closest(ubselector).find('input').val('');
+                        $(this).closest(ubselector).find('.PageListSelectUnselectButton').remove();
                     }
                     else {
                         $(this).addClass('confirmunselect').text(confirmtext);
@@ -76,14 +85,18 @@ class PageListSelectUnselectButton extends WireData implements Module {
                 });
             });
             function unselectbutton(el) {
+                // append button if field is not empty
+                // and button is not already there                
                 if($(el).find('input').val() != '' && $(el).find('input').val() != 0) {
                     if($(el).find('.PageListSelectUnselectButton').length == 0) {
                         $(el).find('ul.PageListActions').append(unselectbtn);
                     }
                 }
+                // remove button if field is empty
                 else {
                     $(el).find('.PageListSelectUnselectButton').remove();
                 }
+
                 // reset confirmbutton
                 if($(el).find('.confirmunselect').length == 1) {
                     $(el).find('.confirmunselect').removeClass('confirmunselect').text(unselecttext);
